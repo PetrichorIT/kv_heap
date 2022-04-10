@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "kv_heap"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[test]]
+name = "kv_heap_test"
+path = "tests/main.rs"
+
+[dev-dependencies]
+rand = "0.7"
+rand_xorshift = "0.2"
+
+[dependencies]
