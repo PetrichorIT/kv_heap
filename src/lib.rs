@@ -248,6 +248,45 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
         KeyValueHeap { data: vec![] }
     }
 
+    /// Creates a new heap using an iteratable object of keys and a mapping to associated values
+    /// as source.
+    ///
+    /// # Examokes
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use kv_heap::{KeyValueHeap, HeapNode};
+    ///
+    /// let mut heap = KeyValueHeap::new_with_mapping(
+    ///     [1, 2, 3, 4, 5, 6, 7],
+    ///     |prio| format!("Prio #{} Object", prio)
+    /// );
+    ///
+    /// assert_eq!(heap.pop(), Some(HeapNode { key: 7, value: "Prio #7 Object".to_string() }));
+    ///
+    /// heap.change_key("Prio #3 Object".to_string(), 10_000);
+    /// assert_eq!(heap.pop(), Some(HeapNode { key: 10_000, value: "Prio #3 Object".to_string() }));
+    /// ```
+    #[must_use]
+    pub fn new_with_mapping<F>(iter: impl IntoIterator<Item = K>, mapping: F) -> KeyValueHeap<K, V>
+    where
+        F: Fn(&K) -> V,
+    {
+        let iter = iter.into_iter();
+        let mut data = Vec::with_capacity(iter.size_hint().0);
+        for key in iter {
+            data.push(HeapNode {
+                value: mapping(&key),
+                key,
+            })
+        }
+
+        let mut heap = Self { data };
+        heap.rebuild();
+        heap
+    }
+
     /// Creates an empty `KeyValueHeap` with a specific capacity.
     /// This preallocates enough memory for `capacity` elements,
     /// so that the `KeyValueHeap` does not have to be reallocated
@@ -262,7 +301,6 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
     /// let mut heap = KeyValueHeap::with_capacity(10);
     /// heap.push(4, "Eve");
     /// ```
-
     #[must_use]
     pub fn with_capacity(capacity: usize) -> KeyValueHeap<K, V> {
         KeyValueHeap {
@@ -299,7 +337,6 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
     ///
     /// If the item is modified then the worst case time complexity is *O*(log(*n*)),
     /// otherwise it's *O*(1).
-
     pub fn peek_mut(&mut self) -> Option<PeekMut<'_, K, V>> {
         if self.is_empty() {
             None
@@ -340,6 +377,26 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
 
             item
         })
+    }
+
+    pub fn check_integrity(&self) -> bool {
+        let mut indices = vec![0];
+        while let Some(i) = indices.pop() {
+            if i >= self.data.len() {
+                continue;
+            }
+            let left = 2 * i + 1;
+            let right = 2 * i + 2;
+
+            let parent_element = &self.data[i];
+            if left < self.data.len() && self.data[left].key >= parent_element.key {
+                return false;
+            }
+            if right < self.data.len() && self.data[right].key >= parent_element.key {
+                return false;
+            }
+        }
+        true
     }
 
     /// Pushes an item onto the binary heap.
@@ -386,31 +443,43 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
     /// This function changes the key of the first element with the given key.
     /// Caller must gurantee that key exists.
     ///
-    pub fn increase_key<U>(&mut self, key: U, new_key: K)
+    pub fn change_key<U>(&mut self, value: U, new_key: K)
     where
-        U: Borrow<K>,
+        U: Borrow<V>,
+        V: PartialEq,
     {
         let (index, _) = self
             .data
             .iter()
             .enumerate()
-            .find(|(_, node)| node.key == *key.borrow())
+            .find(|(_, node)| node.value == *value.borrow())
             .unwrap();
 
-        self.increase_key_by_index(index, new_key)
+        unsafe { self.change_key_by_index(index, new_key) }
     }
 
-    fn increase_key_by_index(&mut self, mut index: usize, new_key: K) {
+    unsafe fn change_key_by_index(&mut self, index: usize, new_key: K) {
         if new_key <= self.data[index].key {
-            return;
-        }
+            self.data[index].key = new_key;
 
-        self.data[index].key = new_key;
+            // Move to top
+            let mut hole = Hole::new(&mut self.data, index);
+            while hole.pos() != 0 {
+                let parent = (hole.pos() - 1) / 2;
+                // SAFETY: Same as above
+                unsafe { hole.move_to(parent) };
+            }
 
-        while index != 0 && self.data[(index - 1) / 2].key < self.data[index].key {
-            // Optimize using hole
-            self.data.swap(index, (index - 1) / 2);
-            index = (index - 1) / 2
+            drop(hole);
+            let node = self.pop().unwrap();
+            let old_len = self.data.len();
+
+            self.data.push(node);
+            self.sift_up(0, old_len);
+        } else {
+            // Change key towards root.
+            self.data[index].key = new_key;
+            self.sift_up(0, index);
         }
     }
 

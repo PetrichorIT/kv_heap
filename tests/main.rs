@@ -308,14 +308,50 @@ fn test_drain_sorted() {
 
 #[test]
 fn test_increase_key() {
-    let heap_a = KeyValueHeap::from(vec![1, 2, 3, 5, 7, 10]);
-    let mut heap_b = KeyValueHeap::from(vec![1, 2, 3, 5, 7, 10]);
+    let heap_a =
+        KeyValueHeap::<usize, String>::new_with_mapping([1, 2, 3, 5, 7, 10], |i| format!("{}", i));
+    let mut heap_b =
+        KeyValueHeap::<usize, String>::new_with_mapping([1, 2, 3, 5, 7, 10], |i| format!("{}", i));
+
+    assert!(heap_b.check_integrity());
 
     assert_eq!(heap_a, heap_b);
-    heap_b.increase_key(7, 11);
+
+    heap_b.change_key("7".to_string(), 11);
+    assert!(heap_b.check_integrity());
 
     assert_ne!(heap_a, heap_b);
-    assert_eq!(heap_b.into_sorted_vec(), [1, 2, 3, 5, 10, 7])
+    assert_eq!(
+        heap_b.clone().into_sorted_vec(),
+        ["1", "2", "3", "5", "10", "7"]
+    );
+
+    heap_b.change_key("2".to_string(), 9);
+    assert!(heap_b.check_integrity());
+
+    assert_ne!(heap_a, heap_b);
+    assert_eq!(
+        heap_b.clone().into_sorted_vec(),
+        ["1", "3", "5", "2", "10", "7"]
+    );
+
+    heap_b.change_key("2".to_string(), 15);
+    assert!(heap_b.check_integrity());
+
+    assert_ne!(heap_a, heap_b);
+    assert_eq!(
+        heap_b.clone().into_sorted_vec(),
+        ["1", "3", "5", "10", "7", "2"]
+    );
+
+    heap_b.change_key("2".to_string(), 0);
+    assert!(heap_b.check_integrity());
+
+    assert_ne!(heap_a, heap_b);
+    assert_eq!(
+        heap_b.clone().into_sorted_vec(),
+        ["2", "1", "3", "5", "10", "7"]
+    );
 }
 
 #[test]
