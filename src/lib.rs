@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
-use core::fmt;
-use core::iter::{FromIterator, FusedIterator};
-use core::mem::{self, swap, ManuallyDrop};
-use core::ops::{Deref, DerefMut};
-use core::ptr;
+use std::fmt;
+use std::iter::{FromIterator, FusedIterator};
+use std::mem::{self, swap, ManuallyDrop};
+use std::ops::{Deref, DerefMut};
+use std::ptr;
 
 use std::borrow::Borrow;
 use std::collections::TryReserveError;
@@ -439,23 +439,38 @@ impl<K: Ord, V> KeyValueHeap<K, V> {
         unsafe { self.sift_up(0, old_len) };
     }
 
+    /// Changes the key of an associated value.
     ///
-    /// This function changes the key of the first element with the given key.
-    /// Caller must gurantee that key exists.
+    /// Note that this will only change the key of the first value
+    /// that equals the given parameter `value`.
     ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    /// ```
+    /// use kv_heap::*;
+    ///
+    /// let mut heap = KeyValueHeap::from([1, 2, 3, 4, 5]);
+    /// heap.change_key(2, 10);
+    ///
+    /// assert_eq!(heap.pop(), Some(HeapNode { key: 10, value: 2}));
+    /// ```
     pub fn change_key<U>(&mut self, value: U, new_key: K)
     where
         U: Borrow<V>,
         V: PartialEq,
     {
-        let (index, _) = self
-            .data
-            .iter()
-            .enumerate()
-            .find(|(_, node)| node.value == *value.borrow())
-            .unwrap();
-
-        unsafe { self.change_key_by_index(index, new_key) }
+        unsafe {
+            self.change_key_by_index(
+                self.data
+                    .iter()
+                    .enumerate()
+                    .find(|(_, node)| node.value == *value.borrow())
+                    .unwrap()
+                    .0,
+                new_key,
+            )
+        }
     }
 
     unsafe fn change_key_by_index(&mut self, index: usize, new_key: K) {
