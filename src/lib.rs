@@ -197,10 +197,10 @@ impl<K: Ord, V> DerefMut for PeekMut<'_, K, V> {
 impl<'a, K: Ord, V> PeekMut<'a, K, V> {
     /// Removes the peeked value from the heap and returns it.
 
-    pub fn pop(mut this: PeekMut<'a, K, V>) -> V {
+    pub fn pop(mut this: PeekMut<'a, K, V>) -> HeapNode<K, V> {
         let value = this.heap.pop().unwrap();
         this.sift = false;
-        value.value
+        value
     }
 }
 
